@@ -36,6 +36,11 @@ import java.util.List;
 public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Callback,
         Camera.PreviewCallback, Camera.ErrorCallback {
     public static final String TAG = CameraSurfaceView.class.getSimpleName();
+    public static final int CAMERA_FACING_BACK = 0;
+
+    public static final int CAMERA_FACING_FRONT = 1;
+
+    public static final int CAMERA_USB = 2;
 
     // 相机
     public Camera mCamera;
@@ -44,34 +49,54 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
 
     protected SurfaceHolder mSurfaceHolder;
     protected int mPreviewDegree;
-    protected int mPreviewWidth;
-    protected int mPreviewHeight;
+    /**
+     * 预览宽
+     */
+    public int mPreviewWidth;
+    /**
+     * 预览高
+     */
+    public int mPreviewHeight;
     protected boolean mIsCompletion = false;
     protected DisplayMetrics dm;
-    private boolean isPIR;
+    /**
+     * true Ir,falseRgb
+     */
+    private boolean ir;
+    /**
+     * 当前相机的ID。
+     */
+    private int cameraFacing = CAMERA_FACING_FRONT;
+
     private FaceView faceView;
     private boolean faceDetect;
     private int screenHeight, screenWidth;
-
+    private Context mContext;
 
     public CameraSurfaceView(Context context) {
         super(context);
-        SurfaceView surfaceView = new SurfaceView(context);
+        mContext = context;
+    }
+
+    /**
+     * 创建预览view
+     */
+    public void createPreview() {
+        SurfaceView surfaceView = new SurfaceView(mContext);
         mSurfaceHolder = surfaceView.getHolder();
         mSurfaceHolder.addCallback(this);
         mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         dm = new DisplayMetrics();
-        if (context instanceof Activity) {
-            Activity activity = (Activity) context;
+        if (mContext instanceof Activity) {
+            Activity activity = (Activity) mContext;
             Display display = activity.getWindowManager().getDefaultDisplay();
             display.getMetrics(dm);
             screenHeight = display.getHeight();
             screenWidth = display.getWidth();
         }
         addView(surfaceView);
-        faceView = new FaceView(context);
+        faceView = new FaceView(mContext);
         addView(faceView);
-
     }
 
     @Override
@@ -91,7 +116,21 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
+        if (mCamera == null) {
+            try {
+                mCamera = open();
+            } catch (RuntimeException e) {
+                e.printStackTrace();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
 
+        if (mCamera == null) {
+            Log.e(TAG, "相机未找到");
+            return;
+        }
+        startPreview();
     }
 
     @Override
@@ -99,14 +138,18 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
                                int format,
                                int width,
                                int height) {
-        if (holder.getSurface() == null) {
-            return;
-        }
-        startPreview();
+//        if (holder.getSurface() == null) {
+//            return;
+//        }
+//        startPreview();
+        Log.i(TAG, "mCameraId:" + mCameraId + ",surfaceChanged,width:" + width + ",height:" + height);
+
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.i(TAG, "mCameraId:" + mCameraId + ",surfaceDestroyed");
+
     }
 
 
@@ -132,8 +175,7 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         return rectList;
     }
 
-    /**
-     * https://blog.csdn.net/yanzi1225627/article/details/38098729
+    /***
      *
      * @param matrix
      * @param mirror
@@ -153,67 +195,79 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         matrix.postTranslate(viewWidth / 2f, viewHeight / 2f);
     }
 
-    private Camera open() {
-        Camera camera;
+    private synchronized Camera open() {
+        Camera camera = null;
         int numCameras = Camera.getNumberOfCameras();
         if (numCameras == 0) {
             return null;
         }
+        Log.i(TAG, "cameraFacing:" + cameraFacing);
 
-        int index = 0;
-        while (index < numCameras) {
+        int countFront = 0, countBack = 0;
+        for (int i = 0; i < numCameras; i++) {
             Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
-            Camera.getCameraInfo(index, cameraInfo);
+            Camera.getCameraInfo(i, cameraInfo);
             Log.i(TAG, "摄像头facing:" + cameraInfo.facing);
             if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+                countFront++;
+            } else {
+                countBack++;
+            }
+        }
+        if (countFront == 1 && countBack == 1){
+            camera = Camera.open(1);
+            mCameraId = 1;
+            return camera;
+        }
+        switch (cameraFacing) {
+
+            case CAMERA_FACING_BACK: {
+                camera = Camera.open(0);
+                mCameraId = 0;
                 break;
             }
-            index++;
-        }
-        if (index < numCameras) {
-            camera = Camera.open(index);
-            mCameraId = index;
-        } else {
-            camera = Camera.open(0);
-            mCameraId = 0;
+            //双目
+            case CAMERA_FACING_FRONT: {
+                camera = Camera.open(0);
+                mCameraId = 0;
+                break;
+            }
+            case CAMERA_USB: {
+                camera = Camera.open(1);
+                mCameraId = 1;
+                break;
+            }
+
+            default:
+                break;
+
         }
         return camera;
     }
 
+
     public synchronized void startPreview() {
         if (mCamera == null) {
-            try {
-                mCamera = open();
-            } catch (RuntimeException e) {
-                e.printStackTrace();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        if (mCamera == null) {
-            Log.e(TAG, "相机未找到");
             return;
         }
-        if (mCameraParam == null) {
-            mCameraParam = mCamera.getParameters();
-        }
-        mCameraParam.setPictureFormat(ImageFormat.JPEG);
+        mCameraParam = mCamera.getParameters();
         mPreviewDegree = getRotateAngle();
         mCamera.setDisplayOrientation(mPreviewDegree);
-        print();
-        int maxWithOrHeight;
-        if (screenWidth < screenHeight) {
-            maxWithOrHeight = Math.min(screenWidth, screenHeight);
-        } else {//横屏
-            maxWithOrHeight = (int) (Math.max(screenWidth, screenHeight) * 0.8f);
-        }
+        mCameraParam.setPictureFormat(ImageFormat.JPEG);
+
+//        print();
+        // 图片越大，性能消耗越大，也可以选择640*480， 1280*720
+//        int maxWithOrHeight = 1280;16/9
+        int maxWithOrHeight = 640;
+        float rate= 4/3f;
         List<Camera.Size> supportedPictureSizes = mCameraParam.getSupportedPictureSizes();
-        Camera.Size pictureSize = CameraHelper.getInstance().getNearestSize(getContext(), supportedPictureSizes, maxWithOrHeight);
+        Camera.Size  pictureSize = CameraHelper.getInstance().getSizeByRate(supportedPictureSizes,rate, maxWithOrHeight);
+
+
         mCameraParam.setPictureSize(pictureSize.width, pictureSize.height);
 
         List<Camera.Size> supportedPreviewSizes = mCameraParam.getSupportedPreviewSizes();
-        Camera.Size previewSize = CameraHelper.getInstance().getNearestSize(getContext(), supportedPreviewSizes, maxWithOrHeight);
+        Camera.Size previewSize =CameraHelper.getInstance().getSizeByRate(supportedPreviewSizes,rate, maxWithOrHeight);
         mPreviewWidth = previewSize.width;
         mPreviewHeight = previewSize.height;
 
@@ -223,9 +277,8 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         mPreviewHeight = point.y;*/
 
         mCameraParam.setPreviewSize(mPreviewWidth, mPreviewHeight);
-        Log.e(TAG, "pictureSize.width = " + pictureSize.width + ", pictureSize.height = " + pictureSize.height);
-
-        Log.e(TAG, "mPreviewWidth = " + mPreviewWidth + ", mPreviewHeight = " + mPreviewHeight + ",mPreviewDegree=" + mPreviewDegree);
+        Log.e(TAG, "pictureSize,width = " + pictureSize.width + ", height = " + pictureSize.height);
+        Log.e(TAG, "previewSize,width=" + mPreviewWidth + ", height = " + mPreviewHeight + ",previewDegree=" + mPreviewDegree);
         // Preview 768,432
 
 
@@ -246,7 +299,9 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
 
         LinearLayout.LayoutParams cameraFL = new LinearLayout.LayoutParams(width, height);
         setLayoutParams(cameraFL);
+
         mCamera.setParameters(mCameraParam);
+
 
         try {
             mCamera.setPreviewDisplay(mSurfaceHolder);
@@ -255,6 +310,7 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
             mCamera.setPreviewCallback(this);
             mCamera.startPreview();
             startFaceDetect();
+            mIsCompletion = false;
         } catch (Exception e) {
             e.printStackTrace();
             if (mCamera != null) {
@@ -266,33 +322,31 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
     }
 
 
-    private void startFaceDetect() {
-        if (!faceDetect) {
-            return;
-        }
+    public void startFaceDetect() {
         if (mCamera == null) {
-            startPreview();
             return;
         }
+        Log.i(TAG, "mCameraId:" + mCameraId + ",开始人脸检测");
+
         mCamera.startFaceDetection();   //开始人脸检测
         mCamera.setFaceDetectionListener(new Camera.FaceDetectionListener() {
             @Override
             public void onFaceDetection(Camera.Face[] faces, Camera camera) {
                 if (faceView != null) {
-//                    Log.i(TAG, "检测到人脸数:" + faces.length);
+//                    Log.i(TAG, "mCameraId:" + mCameraId + ",检测到人脸数:" + faces.length);
                     List<RectF> rectFS = transForm(faces);
                     faceView.setFaces(rectFS);
                 }
             }
         });
-
     }
 
-    private void stopFaceDetect() {
-        if (!faceDetect) {
+    public void stopFaceDetect() {
+        if (mCamera == null) {
             return;
         }
         mCamera.stopFaceDetection();
+        mCamera.setFaceDetectionListener(null);
     }
 
     public synchronized void stopPreview() {
@@ -300,10 +354,10 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         if (mCamera != null) {
             try {
                 stopFaceDetect();
-                mCamera.setFaceDetectionListener(null);
                 mCamera.setErrorCallback(null);
                 mCamera.setPreviewCallback(null);
                 mCamera.stopPreview();
+                mIsCompletion = true;
             } catch (RuntimeException e) {
                 e.printStackTrace();
             } catch (Exception e) {
@@ -357,8 +411,11 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
     }
 
 
-    private void print() {
+    public void print() {
 //        setScaleX(-1);
+        if (mCameraParam == null){
+            return;
+        }
         List<Camera.Size> supportedPreviewSizes = sortSize(mCameraParam.getSupportedPreviewSizes());
         List<Camera.Size> supportedPictureSizes = sortSize(mCameraParam.getSupportedPictureSizes());
         StringBuilder sb = new StringBuilder("\n");
@@ -423,13 +480,26 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         this.mIsCompletion = completion;
     }
 
-    public Camera.Size getPreviewSize() {
-        Camera.Size previewSize = mCamera.getParameters().getPreviewSize();
-        return previewSize;
+    public CameraSurfaceView setFaceDetect(boolean faceDetect) {
+        this.faceDetect = faceDetect;
+        return this;
+    }
+    public CameraSurfaceView setCameraFacing(int cameraFacing) {
+        this.cameraFacing = cameraFacing;
+        return this;
     }
 
-    public void setFaceDetect(boolean faceDetect) {
-        this.faceDetect = faceDetect;
-        startFaceDetect();
+    public int getCameraFacing() {
+        return cameraFacing;
     }
+
+    public boolean isIr() {
+        return ir;
+    }
+
+    public void setIr(boolean ir) {
+        this.ir = ir;
+    }
+
+
 }

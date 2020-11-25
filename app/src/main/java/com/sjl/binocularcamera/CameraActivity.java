@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import com.sjl.binocularcamera.util.BitmapUtils;
 import com.sjl.binocularcamera.util.CameraHelper;
@@ -34,82 +35,111 @@ import java.io.FileOutputStream;
 public class CameraActivity extends BaseActivity {
     public static final String TAG = CameraActivity.class.getSimpleName();
 
-    private CameraSurfaceView mRgbSurfaceView, mIrSurfaceView;
+    private CameraSurfaceView mCameraSurfaceView1, mCameraSurfaceView2;
     private ImageView iv_rgb, iv_ir;
     private LinearLayout ll_surface_layout;
+    private int camera1DataMean, camera2DataMean;
+    private volatile boolean rgbOrIrConfirm, camera1IsRgb;
 
     @Override
     protected int getLayoutId() {
         return R.layout.activity_camera;
     }
+
     @Override
     protected void initView() {
         ll_surface_layout = findViewById(R.id.ll_surface_layout);
         ll_surface_layout.removeAllViews();
         iv_rgb = findViewById(R.id.iv_rgb);
         iv_ir = findViewById(R.id.iv_ir);
-        mRgbSurfaceView = new CameraSurfaceView(this);
-        mRgbSurfaceView.setFaceDetect(true);
-        ll_surface_layout.addView(mRgbSurfaceView);
-        if (CameraHelper.checkBinocularCamera()){
-            mIrSurfaceView = new CameraSurfaceView(this);
-            ll_surface_layout.addView(mIrSurfaceView);
-            mIrSurfaceView.setFaceDetect(true);
-        }
 
     }
-
 
 
     @Override
     protected void initData() {
-        mRgbSurfaceView.setOnPreviewListener(new CameraSurfaceView.OnPreviewListener() {
+        int numberOfCameras = CameraHelper.getNumberOfCameras();
+        if (numberOfCameras < 2) {
+            Toast.makeText(this, "未检测到2个摄像头", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+//
+//        String deviceModel = Build.MODEL;
+//        if (TextUtils.isEmpty(deviceModel) || !(deviceModel.contains("3399") || deviceModel.contains("3288"))) {
+//            Toast.makeText(this, "该系统不支持双目摄像头", Toast.LENGTH_LONG).show();
+//            finish();
+//            return;
+//        }
+        mCameraSurfaceView1 = new CameraSurfaceView(this);
+        ll_surface_layout.addView(mCameraSurfaceView1);
+        mCameraSurfaceView1.setFaceDetect(true)
+                .setCameraFacing(CameraSurfaceView.CAMERA_FACING_FRONT)
+                .createPreview();
+
+        mCameraSurfaceView2 = new CameraSurfaceView(this);
+        ll_surface_layout.addView(mCameraSurfaceView2);
+//        LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) mCameraSurfaceView2.getLayoutParams();
+//        layoutParams.setMargins(0, 20,0, 0);
+        mCameraSurfaceView2.setCameraFacing(CameraSurfaceView.CAMERA_USB)
+                .setFaceDetect(true).createPreview();
+
+        mCameraSurfaceView1.setOnPreviewListener(new CameraSurfaceView.OnPreviewListener() {
             @Override
             public void onPreviewFrame(byte[] data) {
-//                Camera.Size previewSize = mRgbSurfaceView.getPreviewSize();
 //             convertBitmap(data,previewSize.width,previewSize.height,"rgbPreview.jpg");
-              /*  rgbOrIr(0,data);
-                if (rgbOrIrConfirm){
-                    //要等两个摄像头都返回一帧数据，rgbOrIrConfirm才会被赋值，此时才能判断到底哪个是RGB摄像头
-                    choiceRgbOrIrType(0,data);
-                }*/
+                if (!rgbOrIrConfirm) {
+                    rgbOrIr(0,mCameraSurfaceView1.mPreviewWidth, mCameraSurfaceView1.mPreviewHeight, data);
+                    if (rgbOrIrConfirm) {
+                        //要等两个摄像头都返回一帧数据，rgbOrIrConfirm才会被赋值，此时才能判断到底哪个是RGB摄像头
+                        choiceRgbOrIrType(0, data);
+                        if (camera1IsRgb) {
+                            mCameraSurfaceView1.setIr(false);
+                            Log.i(TAG, "mCameraSurfaceView1 is Rgb.mCameraSurfaceView2 is Ir.");
+                        } else {
+                            mCameraSurfaceView1.setIr(true);
+                            Log.i(TAG, "mCameraSurfaceView1 is Ir.mCameraSurfaceView2 is Rgb.");
+                        }
+                    }
+                }
+
             }
-
-
 
 
         });
 
-        if (mIrSurfaceView != null){
-            mIrSurfaceView.setOnPreviewListener(new CameraSurfaceView.OnPreviewListener() {
-                @Override
-                public void onPreviewFrame(byte[] data) {
- //               Camera.Size previewSize = mIrSurfaceView.getPreviewSize();
+        mCameraSurfaceView2.setOnPreviewListener(new CameraSurfaceView.OnPreviewListener() {
+            @Override
+            public void onPreviewFrame(byte[] data) {
 //              convertBitmap(data,previewSize.width,previewSize.height,"irPreview.jpg");
-                    rgbOrIr(1,data);
-                    if (rgbOrIrConfirm){
+                if (!rgbOrIrConfirm) {
+                    rgbOrIr(1, mCameraSurfaceView2.mPreviewWidth, mCameraSurfaceView2.mPreviewHeight, data);
+                    if (rgbOrIrConfirm) {
                         //要等两个摄像头都返回一帧数据，rgbOrIrConfirm才会被赋值，此时才能判断到底哪个是RGB摄像头
-                        choiceRgbOrIrType(1,data);
+                        choiceRgbOrIrType(1, data);
+                        if (camera1IsRgb) {
+                            mCameraSurfaceView2.setIr(true);
+                            Log.i(TAG, "mCameraSurfaceView1 is Ir.mCameraSurfaceView2 is Rgb.");
+                        } else {
+                            mCameraSurfaceView2.setIr(false);
+                            Log.i(TAG, "mCameraSurfaceView1 is Rgb.mCameraSurfaceView2 is Ir.");
+
+                        }
                     }
                 }
 
-
-
-
-            });
-        }
-
+            }
+        });
     }
-    int camera1DataMean,camera2DataMean;
-    int PREFER_WIDTH,PREFER_HEIGHT;
-    boolean rgbOrIrConfirm,camera1IsRgb;
+
 
     /**
      * 参考：https://blog.csdn.net/yzzzza/article/details/107670521
+     *
      * @param index
      * @param data
      */
-    private synchronized void rgbOrIr(int index, byte[] data) {
+    private synchronized void rgbOrIr(int index, int PREFER_WIDTH, int PREFER_HEIGHT, byte[] data) {
         byte[] tmp = new byte[PREFER_WIDTH * PREFER_HEIGHT];
         try {
             System.arraycopy(data, 0, tmp, 0, PREFER_WIDTH * PREFER_HEIGHT);
@@ -129,13 +159,14 @@ public class CameraActivity extends BaseActivity {
         }
         if (camera1DataMean != 0 && camera2DataMean != 0) {
             if (camera1DataMean > camera2DataMean) {
-                camera1IsRgb = true; //惊了，居然是把两个摄像头一帧数据的所有byte值加起来比大小
+                camera1IsRgb = true; //把两个摄像头一帧数据的所有byte值加起来比大小
             } else {
                 camera1IsRgb = false;
             }
             rgbOrIrConfirm = true;
         }
     }
+
     private void choiceRgbOrIrType(int index, byte[] data) {
         // camera1如果为rgb数据，调用dealRgb，否则为Ir数据，调用Ir
         if (index == 0) {
@@ -163,24 +194,16 @@ public class CameraActivity extends BaseActivity {
     @Override
     public void onResume() {
         super.onResume();
-        mRgbSurfaceView.startPreview();
-        Camera.Size previewSize = mRgbSurfaceView.getPreviewSize();
-        PREFER_WIDTH = previewSize.width;
-        PREFER_HEIGHT = previewSize.height;
-        if (mIrSurfaceView != null){
-            mIrSurfaceView.startPreview();
-        }
+        mCameraSurfaceView1.startPreview();
+        mCameraSurfaceView2.startPreview();
     }
 
 
     @Override
     public void onPause() {
         super.onPause();
-        mRgbSurfaceView.stopPreview();
-        if (mIrSurfaceView != null){
-            mIrSurfaceView.stopPreview();
-        }
-
+        mCameraSurfaceView1.stopPreview();
+        mCameraSurfaceView2.stopPreview();
 
     }
 
@@ -192,27 +215,28 @@ public class CameraActivity extends BaseActivity {
         }
 
     }
+
     public void btnRgbTakePhoto(View view) {
-        if (mRgbSurfaceView == null) {
+        if (mCameraSurfaceView1 == null) {
             return;
         }
-        mRgbSurfaceView.mCamera.takePicture(null, null, new Camera.PictureCallback() {
+        mCameraSurfaceView1.mCamera.takePicture(null, null, new Camera.PictureCallback() {
             @Override
             public void onPictureTaken(byte[] data, Camera camera) {
                 Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
 
                 bitmap = convertBmp(bitmap);
                 Matrix matrix = new Matrix();
-                matrix.setRotate(mRgbSurfaceView.getPreviewDegree());
+                matrix.setRotate(mCameraSurfaceView1.getPreviewDegree());
                 bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
 
-                bitmap =BitmapUtils.scaleBitmap(bitmap,0.5f);
+                bitmap = BitmapUtils.scaleBitmap(bitmap, 0.5f);
 
                 iv_rgb.setImageBitmap(bitmap);
 
-                mRgbSurfaceView.startPreview();
+                mCameraSurfaceView1.startPreview();
 
-                saveImg(bitmap,"rgb.jpg");
+                saveImg(bitmap, "rgb.jpg");
 
 
             }
@@ -220,28 +244,23 @@ public class CameraActivity extends BaseActivity {
     }
 
 
-
-
-
-
-
     public void btnIrTakePhoto(View view) {
-        if (mIrSurfaceView == null) {
+        if (mCameraSurfaceView2 == null) {
             return;
         }
-        mIrSurfaceView.mCamera.takePicture(null, null, new Camera.PictureCallback() {
+        mCameraSurfaceView2.mCamera.takePicture(null, null, new Camera.PictureCallback() {
             @Override
             public void onPictureTaken(byte[] data, Camera camera) {
                 Bitmap bm = BitmapFactory.decodeByteArray(data, 0, data.length);
                 Bitmap bitmap = convertBmp(bm);
                 Matrix matrix = new Matrix();
-                matrix.setRotate(mIrSurfaceView.getPreviewDegree());
+                matrix.setRotate(mCameraSurfaceView2.getPreviewDegree());
                 bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
 
-                bitmap = BitmapUtils.scaleBitmap(bitmap,0.5f);
+                bitmap = BitmapUtils.scaleBitmap(bitmap, 0.5f);
                 iv_ir.setImageBitmap(bitmap);
-                mIrSurfaceView.startPreview();
-                saveImg(bm,"ir.jpg");
+                mCameraSurfaceView2.startPreview();
+                saveImg(bm, "ir.jpg");
 
             }
         });
@@ -257,6 +276,7 @@ public class CameraActivity extends BaseActivity {
 
         return convertBmp;
     }
+
     private void saveImg(Bitmap bm, String fileName) {
         File dir = new File(Environment.getExternalStorageDirectory(), "temp");
         if (!dir.exists()) {
@@ -276,17 +296,30 @@ public class CameraActivity extends BaseActivity {
 
     /**
      * 把预览帧转为图片
+     *
      * @param data
      * @param width
      * @param height
      * @param fileName
      */
-    public void convertPreviewFrameToBitmap(byte[] data, int width, int height,String fileName) {
+    public void convertPreviewFrameToBitmap(byte[] data, int width, int height, String fileName) {
         YuvImage image = new YuvImage(data, ImageFormat.NV21, width, height, null);
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         image.compressToJpeg(new Rect(0, 0, width, height), 100, stream);
         Bitmap bitmap = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
-        saveImg(bitmap,fileName);
+        saveImg(bitmap, fileName);
     }
 
+    public void btnFaceDetect(View view) {
+        if (mCameraSurfaceView1 != null) {
+            mCameraSurfaceView1.setFaceDetect(true);
+            mCameraSurfaceView1.stopFaceDetect();
+            mCameraSurfaceView1.startPreview();
+        }
+        if (mCameraSurfaceView2 != null) {
+            mCameraSurfaceView2.setFaceDetect(true);
+            mCameraSurfaceView2.stopFaceDetect();
+            mCameraSurfaceView2.startPreview();
+        }
+    }
 }

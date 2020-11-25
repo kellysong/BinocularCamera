@@ -9,7 +9,6 @@ import android.hardware.Camera.CameraInfo;
 import android.hardware.Camera.Size;
 import android.os.Build;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
 import android.view.WindowManager;
@@ -85,7 +84,9 @@ public class CameraHelper {
         Collections.sort(list, sizeComparator);
         Camera.Size resultSize = null;
         for (Camera.Size size : list) {
-            if ((float) size.width / size.height == rate && size.width <= maxWithOrHeight && size.height <= maxWithOrHeight) {
+            boolean b = equalRate(size, rate);
+
+            if (b && size.width <= maxWithOrHeight && size.height <= maxWithOrHeight) {
                 if (resultSize == null) {
                     resultSize = size;
                 } else if (size.width > resultSize.width) {
@@ -132,18 +133,19 @@ public class CameraHelper {
         }
     }
 
-    public Point findBestSizeValue(List<Size> rawSupportedSizes, float rate, int previewSize) {
-        Size nearestSize = getNearestSize2(rawSupportedSizes, rate, previewSize);
+    public Point findBestPointByRate(List<Size> rawSupportedSizes, float rate, int previewSize) {
+        Size nearestSize = getSizeByRate(rawSupportedSizes, rate, previewSize);
         Point point = new Point(nearestSize.width, nearestSize.height);
         return point;
     }
 
 
-    public Size getNearestSize2(List<Size> list, float rate, int maxWithOrHeight) {
+    public Size getSizeByRate(List<Size> list, float rate, int maxWithOrHeight) {
         Collections.sort(list, sizeComparator);
         Camera.Size resultSize = null;
         for (Camera.Size size : list) {
-            if ((float) size.width / size.height == rate && size.width <= maxWithOrHeight && size.height <= maxWithOrHeight) {
+
+            if (equalRate(size,rate) && size.width <= maxWithOrHeight && size.height <= maxWithOrHeight) {
                 if (resultSize == null) {
                     resultSize = size;
                 } else if (size.width > resultSize.width) {
@@ -306,33 +308,6 @@ public class CameraHelper {
     public static int getNumberOfCameras() {
         int numCameras = Camera.getNumberOfCameras();
         return numCameras;
-    }
-
-    /**
-     * 判断是否双目摄像头兼容部分设备
-     *
-     * @return
-     */
-    public static boolean checkBinocularCamera() {
-        int numCameras = Camera.getNumberOfCameras();
-        if (numCameras < 2) {
-            return false;
-        }
-        int countFront = 0, countBack = 0;
-        for (int i = 0; i < numCameras; i++) {
-            Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
-            Camera.getCameraInfo(i, cameraInfo);
-            Log.i(TAG, "摄像头facing:" + cameraInfo.facing);
-            if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-                countFront++;
-            } else {
-                countBack++;
-            }
-        }
-        if (countBack == 2) {
-            return true;
-        }
-        return false;
     }
 
     private static final int MIN_PREVIEW_PIXELS = 307200;
