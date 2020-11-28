@@ -43,7 +43,6 @@
            android:layout_width="match_parent"
            android:layout_height="wrap_content">
            <Button
-               android:id="@+id/btn_rgb"
                android:layout_width="wrap_content"
                android:layout_height="wrap_content"
                android:onClick="btnFaceDetect"
@@ -54,14 +53,20 @@
                android:layout_width="wrap_content"
                android:layout_height="wrap_content"
                android:onClick="btnRgbTakePhoto"
-               android:text="RGB抓拍" />
+               android:text="@string/rgb_capture" />
 
            <Button
                android:id="@+id/btn_ir"
                android:layout_width="wrap_content"
                android:layout_height="wrap_content"
                android:onClick="btnIrTakePhoto"
-               android:text="IR抓拍" />
+               android:text="@string/ir_capture" />
+           <Button
+               android:id="@+id/btn_setting"
+               android:layout_width="wrap_content"
+               android:layout_height="wrap_content"
+               android:onClick="btnSetting"
+               android:text="@string/setting" />
        </LinearLayout>
     </LinearLayout>
 

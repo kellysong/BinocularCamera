@@ -1,3 +1,14 @@
 <resources>
     <string name="app_name">BinocularCamera</string>
+    <string name="rgb_capture">RGB抓拍</string>
+    <string name="ir_capture">IR抓拍</string>
+    <string name="setting">设置</string>
+
+    <string-array name="arr_preview_degree">
+        <item>自动获取</item>
+        <item>0</item>
+        <item>90</item>
+        <item>180</item>
+        <item>270</item>
+    </string-array>
 </resources>

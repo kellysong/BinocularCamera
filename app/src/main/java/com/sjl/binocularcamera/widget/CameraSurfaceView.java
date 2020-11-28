@@ -7,6 +7,7 @@ import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.hardware.Camera;
+import android.util.ArrayMap;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * TODO
@@ -31,7 +33,7 @@ import java.util.List;
  * @version 1.0.0
  * @filename MYSurfaceView
  * @time 2020/11/14 16:06
- * @copyright(C) 2020 泰中科技
+ * @copyright(C) 2020 song
  */
 public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Callback,
         Camera.PreviewCallback, Camera.ErrorCallback {
@@ -48,7 +50,7 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
     protected int mCameraId;
 
     protected SurfaceHolder mSurfaceHolder;
-    protected int mPreviewDegree;
+    protected int mPreviewDegree = -1;
     /**
      * 预览宽
      */
@@ -72,6 +74,14 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
     private boolean faceDetect;
     private int screenHeight, screenWidth;
     private Context mContext;
+    /**
+     * 建议选择640*480， 1280*720
+     * int maxWithOrHeight = 1280;16/9
+     */
+    private int maxWithOrHeight = 640;
+    private float rate = 4 / 3f;
+    private SurfaceView surfaceView;
+    private static Map<Integer, Integer> exist = new ArrayMap<>();
 
     public CameraSurfaceView(Context context) {
         super(context);
@@ -82,7 +92,7 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
      * 创建预览view
      */
     public void createPreview() {
-        SurfaceView surfaceView = new SurfaceView(mContext);
+        surfaceView = new SurfaceView(mContext);
         mSurfaceHolder = surfaceView.getHolder();
         mSurfaceHolder.addCallback(this);
         mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
@@ -95,6 +105,7 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
             screenWidth = display.getWidth();
         }
         addView(surfaceView);
+
         faceView = new FaceView(mContext);
         addView(faceView);
     }
@@ -128,6 +139,7 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
 
         if (mCamera == null) {
             Log.e(TAG, "相机未找到");
+            setVisibility(GONE);//不显示，防止界面黑屏
             return;
         }
         startPreview();
@@ -203,7 +215,7 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         }
         Log.i(TAG, "cameraFacing:" + cameraFacing);
 
-        int countFront = 0, countBack = 0;
+/*        int countFront = 0, countBack = 0;
         for (int i = 0; i < numCameras; i++) {
             Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
             Camera.getCameraInfo(i, cameraInfo);
@@ -213,28 +225,20 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
             } else {
                 countBack++;
             }
-        }
-        if (countFront == 1 && countBack == 1){
-            camera = Camera.open(1);
-            mCameraId = 1;
-            return camera;
-        }
+        }*/
         switch (cameraFacing) {
 
             case CAMERA_FACING_BACK: {
-                camera = Camera.open(0);
-                mCameraId = 0;
+                camera = initCamera(0);
                 break;
             }
             //双目
             case CAMERA_FACING_FRONT: {
-                camera = Camera.open(0);
-                mCameraId = 0;
+                camera = initCamera(0);
                 break;
             }
             case CAMERA_USB: {
-                camera = Camera.open(1);
-                mCameraId = 1;
+                camera = initCamera(1);
                 break;
             }
 
@@ -245,29 +249,43 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         return camera;
     }
 
+    private synchronized Camera initCamera(int cameraId) {
+        if (exist.get(cameraId) != null) {
+            return null;
+        }
+        Camera camera = Camera.open(cameraId);
+        mCameraId = cameraId;
+        exist.put(mCameraId, mCameraId);
+        return camera;
+    }
 
+    /**
+     * 开始预览
+     */
     public synchronized void startPreview() {
         if (mCamera == null) {
             return;
         }
         mCameraParam = mCamera.getParameters();
-        mPreviewDegree = getRotateAngle();
+        if (mPreviewDegree < 0){
+            mPreviewDegree = getRotateAngle();
+        }
+
         mCamera.setDisplayOrientation(mPreviewDegree);
+        mCameraParam.set("rotation", mPreviewDegree);
         mCameraParam.setPictureFormat(ImageFormat.JPEG);
 
 //        print();
-        // 图片越大，性能消耗越大，也可以选择640*480， 1280*720
-//        int maxWithOrHeight = 1280;16/9
-        int maxWithOrHeight = 640;
-        float rate= 4/3f;
+
+
         List<Camera.Size> supportedPictureSizes = mCameraParam.getSupportedPictureSizes();
-        Camera.Size  pictureSize = CameraHelper.getInstance().getSizeByRate(supportedPictureSizes,rate, maxWithOrHeight);
+        Camera.Size pictureSize = CameraHelper.getInstance().getSizeByRate(supportedPictureSizes, rate, maxWithOrHeight);
 
 
         mCameraParam.setPictureSize(pictureSize.width, pictureSize.height);
 
         List<Camera.Size> supportedPreviewSizes = mCameraParam.getSupportedPreviewSizes();
-        Camera.Size previewSize =CameraHelper.getInstance().getSizeByRate(supportedPreviewSizes,rate, maxWithOrHeight);
+        Camera.Size previewSize = CameraHelper.getInstance().getSizeByRate(supportedPreviewSizes, rate, maxWithOrHeight);
         mPreviewWidth = previewSize.width;
         mPreviewHeight = previewSize.height;
 
@@ -303,13 +321,16 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         mCamera.setParameters(mCameraParam);
 
 
+
         try {
             mCamera.setPreviewDisplay(mSurfaceHolder);
             mCamera.stopPreview();
             mCamera.setErrorCallback(this);
             mCamera.setPreviewCallback(this);
             mCamera.startPreview();
-            startFaceDetect();
+            if (faceDetect) {
+                startFaceDetect();
+            }
             mIsCompletion = false;
         } catch (Exception e) {
             e.printStackTrace();
@@ -321,7 +342,9 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         }
     }
 
-
+    /**
+     * 开始人脸检测
+     */
     public void startFaceDetect() {
         if (mCamera == null) {
             return;
@@ -341,6 +364,9 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         });
     }
 
+    /**
+     * 停止人脸检测
+     */
     public void stopFaceDetect() {
         if (mCamera == null) {
             return;
@@ -349,17 +375,32 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         mCamera.setFaceDetectionListener(null);
     }
 
+    /**
+     * 停止预览
+     */
     public synchronized void stopPreview() {
-        mIsCompletion = false;
         if (mCamera != null) {
             try {
                 stopFaceDetect();
-                mCamera.setErrorCallback(null);
-                mCamera.setPreviewCallback(null);
                 mCamera.stopPreview();
                 mIsCompletion = true;
-            } catch (RuntimeException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+
+    }
+
+    /**
+     * 关闭预览并释放内存
+     */
+    public synchronized void release() {
+        exist.clear();
+        if (mCamera != null) {
+            try {
+                stopPreview();
+                mCamera.setErrorCallback(null);
+                mCamera.setPreviewCallback(null);
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
@@ -406,14 +447,17 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         } else {
             result = (info.orientation - degrees + 360) % 360;
         }
-
         return result;
     }
 
 
+
+
+
+
     public void print() {
 //        setScaleX(-1);
-        if (mCameraParam == null){
+        if (mCameraParam == null) {
             return;
         }
         List<Camera.Size> supportedPreviewSizes = sortSize(mCameraParam.getSupportedPreviewSizes());
@@ -484,8 +528,26 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
         this.faceDetect = faceDetect;
         return this;
     }
+
     public CameraSurfaceView setCameraFacing(int cameraFacing) {
         this.cameraFacing = cameraFacing;
+        return this;
+    }
+
+    public CameraSurfaceView setMaxWithOrHeight(int maxWithOrHeight) {
+        this.maxWithOrHeight = maxWithOrHeight;
+        return this;
+    }
+
+
+    public CameraSurfaceView setRate(float rate) {
+        this.rate = rate;
+        return this;
+    }
+
+
+    public CameraSurfaceView setPreviewDegree(int mPreviewDegree) {
+        this.mPreviewDegree = mPreviewDegree;
         return this;
     }
 
@@ -499,6 +561,14 @@ public class CameraSurfaceView extends FrameLayout implements SurfaceHolder.Call
 
     public void setIr(boolean ir) {
         this.ir = ir;
+    }
+
+    public int getMaxWithOrHeight() {
+        return maxWithOrHeight;
+    }
+
+    public float getRate() {
+        return rate;
     }
 
 

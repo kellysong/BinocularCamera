@@ -7,6 +7,7 @@
     tools:context=".MainActivity">
 
     <Button
+        android:id="@+id/btnOpen"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:onClick="btnOpenCamera"
@@ -16,4 +17,13 @@
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="10dp"
+        android:text="1.打开前,请检查usb摄像头（双目）是否接触良好或平板是否具备双目摄像头\n
+ 2.人脸检测是基于系统自带的，不同系统可能存在差异"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnOpen" />
 </androidx.constraintlayout.widget.ConstraintLayout>

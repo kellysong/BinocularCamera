@@ -19,7 +19,7 @@ import java.util.List;
  * @version 1.0.0
  * @filename FaceView
  * @time 2020/11/14 17:21
- * @copyright(C) 2020 泰中科技
+ * @copyright(C) 2020 song
  */
 public class FaceView extends View {
     private Paint mPaint;
@@ -37,7 +37,7 @@ public class FaceView extends View {
         mPaint = new Paint();
         mPaint.setColor(Color.parseColor(mColor));
         mPaint.setStyle(Paint.Style.STROKE);
-        mPaint.setStrokeWidth(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 2f, getContext().getResources().getDisplayMetrics()));
+        mPaint.setStrokeWidth(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 2.5f, getContext().getResources().getDisplayMetrics()));
         mPaint.setAntiAlias(true);
     }
 

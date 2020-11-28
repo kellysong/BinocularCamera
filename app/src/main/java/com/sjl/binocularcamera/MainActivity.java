@@ -3,6 +3,9 @@ package com.sjl.binocularcamera;
 import android.content.Intent;
 import android.view.View;
 
+/**
+ * @author song
+ */
 public class MainActivity extends BaseActivity {
 
 
@@ -24,4 +27,6 @@ public class MainActivity extends BaseActivity {
     public void btnOpenCamera(View view) {
         startActivity(new Intent(this,CameraActivity.class));
     }
+
+
 }
