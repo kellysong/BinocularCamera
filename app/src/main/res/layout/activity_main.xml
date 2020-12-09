@@ -17,6 +17,16 @@
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <Button
+        android:id="@+id/btnImgDetect"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:onClick="btnImgDetect"
+        android:text="静态图片检测"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnOpen" />
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -25,5 +35,5 @@
  2.人脸检测是基于系统自带的，不同系统可能存在差异"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnOpen" />
+        app:layout_constraintTop_toBottomOf="@id/btnImgDetect" />
 </androidx.constraintlayout.widget.ConstraintLayout>

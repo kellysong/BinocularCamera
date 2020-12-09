@@ -29,4 +29,7 @@ public class MainActivity extends BaseActivity {
     }
 
 
+    public void btnImgDetect(View view) {
+        startActivity(new Intent(this,ImgDetectActivity.class));
+    }
 }
